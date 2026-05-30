@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bare Minimum Living Together Budget — Aabid, Noor & Mylo</title>
+  <script src="https://unpkg.com/react@18.2.0/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    body { background-color: #FAF7F2; }
+    /* Hide number spinners for cleaner look */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    /* Card hover lift */
+    .lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+    .lift:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(0,0,0,0.09); }
+    /* Fade-in animation for cards */
+    .fade-in { animation: fadeUp 0.45s ease both; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Progress bar smooth transition */
+    .bar-fill { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    /* Scenario button active ring */
+    .scenario-active { box-shadow: 0 0 0 2px #C9A84C; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    const {
+      PieChart, Pie, Cell, BarChart, Bar,
+      XAxis, YAxis, CartesianGrid, Tooltip,
+      ResponsiveContainer
+    } = Recharts;
+
+    // ── Warm gold / tan chart palette ─────────────────────────────────────
+    const PIE_COLORS = [
+      '#C9A84C','#A0845C','#D4B483','#8B6914',
+      '#E8D5A3','#6B4F2A','#B89660','#7A5E3A',
+      '#C4A87A','#9E7A4F','#DAC591','#7A5C35','#4A3728',
+    ];
+
+    // ── Scenario presets ──────────────────────────────────────────────────
+    const SCENARIOS = {
+      bareMinimum: {
+        label: 'Bare Minimum', desc: 'essentials only',
+        groceries: 600, transport: 400, dining: 0,
+        savings: 500, travel: 0, investments: 0,
+      },
+      comfortable: {
+        label: 'Comfortable', desc: 'breathing room',
+        groceries: 800, transport: 600, dining: 500,
+        savings: 1000, travel: 500, investments: 0,
+      },
+      wealthBuilding: {
+        label: 'Wealth Building', desc: 'growing net worth',
+        groceries: 800, transport: 600, dining: 500,
+        savings: 1500, travel: 500, investments: 2000,
+      },
+    };
+
+    // ── Formatting helpers ────────────────────────────────────────────────
+    const fmt  = (n, d = 0) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const pct  = (n)        => Number(n).toFixed(1) + '%';
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Main App
+    // ─────────────────────────────────────────────────────────────────────
+    function App() {
+
+      // ── Home inputs ──────────────────────────────────────────────────
+      const [homePrice,  setHomePrice]  = useState(550000);
+      const [downPct,    setDownPct]    = useState(20);
+      const [rate,       setRate]       = useState(5);
+      const [term,       setTerm]       = useState(30);
+      const [taxPct,     setTaxPct]     = useState(2.2);
+      const [insurance,  setInsurance]  = useState(230);
+      const [utilities,  setUtilities]  = useState(350);
+      const [hoa,        setHoa]        = useState(0);
+
+      // ── Mylo inputs ──────────────────────────────────────────────────
+      const [myloFood,   setMyloFood]   = useState(100);
+      const [miniGroom,  setMiniGroom]  = useState(180);
+      const [fullGroom,  setFullGroom]  = useState(280);
+
+      // ── Living expense inputs ────────────────────────────────────────
+      const [groceries,  setGroceries]  = useState(600);
+      const [transport,  setTransport]  = useState(400);
+      const [phone,      setPhone]      = useState(150);
+      const [medical,    setMedical]    = useState(300);
+      const [household,  setHousehold]  = useState(150);
+      const [savings,    setSavings]    = useState(500);
+
+      // ── Scenario-driven extras (zero in bare minimum) ────────────────
+      const [dining,       setDining]       = useState(0);
+      const [travel,       setTravel]       = useState(0);
+      const [investments,  setInvestments]  = useState(0);
+
+      // ── Affordability input ──────────────────────────────────────────
+      const [income,         setIncome]         = useState(10000);
+      const [activeScenario, setActiveScenario] = useState('bareMinimum');
+
+      // ── Apply a scenario preset ──────────────────────────────────────
+      const applyScenario = key => {
+        const s = SCENARIOS[key];
+        setGroceries(s.groceries);
+        setTransport(s.transport);
+        setDining(s.dining);
+        setSavings(s.savings);
+        setTravel(s.travel);
+        setInvestments(s.investments);
+        setActiveScenario(key);
+      };
+
+      // ── Core financial calculations ───────────────────────────────────
+      const calc = useMemo(() => {
+
+        // MORTGAGE — standard amortization formula:
+        //   M = P × [r(1+r)^n] / [(1+r)^n − 1]
+        //   P = loan principal, r = monthly interest rate, n = total payments
+        const principal = homePrice * (1 - downPct / 100);
+        const r         = (rate / 100) / 12;          // monthly rate
+        const n         = term * 12;                   // total payments
+        const mortgage  = r === 0
+          ? principal / n
+          : principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+
+        // PROPERTY TAX — annual % of home value spread monthly
+        const propTax = (homePrice * (taxPct / 100)) / 12;
+
+        // GROOMING — mini and full groom ALTERNATE every 6 weeks:
+        //   Total visits/year  = 52 weeks ÷ 6 weeks per visit ≈ 8.667
+        //   Half are mini, half are full:
+        //     mini visits/year = 8.667 / 2 ≈ 4.333
+        //     full visits/year = 8.667 / 2 ≈ 4.333
+        //   Annual cost = (4.333 × miniGroom) + (4.333 × fullGroom)
+        //   Monthly avg = annual / 12
+        const visitsPerYear  = 52 / 6;
+        const groomAnnual    = (visitsPerYear / 2) * miniGroom + (visitsPerYear / 2) * fullGroom;
+        const groomMonthly   = groomAnnual / 12;
+
+        // Totals
+        const totalHousing  = mortgage + propTax + insurance + utilities + hoa;
+        const totalMylo     = myloFood + groomMonthly;
+        const totalExtras   = dining + travel + investments;
+        const totalLiving   = groceries + transport + phone + medical + household + savings + totalExtras;
+        const totalMonthly  = totalHousing + totalMylo + totalLiving;
+
+        // Income requirements
+        const annualAfterTax = totalMonthly * 12;
+        // Pre-tax estimate: assumes ~30% effective federal+state tax rate for TX (no state income tax)
+        const annualPreTax   = annualAfterTax / 0.72;
+
+        // Affordability
+        const surplus      = income - totalMonthly;
+        const pctOfIncome  = income > 0 ? (totalMonthly / income) * 100 : 0;
+        const status       = pctOfIncome > 75 ? 'red' : pctOfIncome > 60 ? 'yellow' : 'green';
+
+        return {
+          mortgage, propTax, groomMonthly,
+          totalHousing, totalMylo, totalLiving, totalMonthly,
+          annualAfterTax, annualPreTax,
+          surplus, pctOfIncome, status,
+          principal, downAmount: homePrice * downPct / 100,
+        };
+      }, [
+        homePrice, downPct, rate, term, taxPct, insurance, utilities, hoa,
+        myloFood, miniGroom, fullGroom,
+        groceries, transport, phone, medical, household, savings,
+        dining, travel, investments, income,
+      ]);
+
+      // ── Budget line items for table + charts ─────────────────────────
+      const items = [
+        { cat: 'Mortgage P&I',          mo: calc.mortgage,     note: `${downPct}% down · ${rate}% · ${term} yr` },
+        { cat: 'Property Taxes',         mo: calc.propTax,      note: `${taxPct}% of home value/yr` },
+        { cat: 'Homeowners Insurance',   mo: insurance,         note: 'Monthly premium' },
+        { cat: 'Utilities',              mo: utilities,         note: 'Electric, gas, water, internet' },
+        { cat: 'HOA',                    mo: hoa,               note: 'Homeowners association' },
+        { cat: 'Mylo — Food',            mo: myloFood,          note: 'Monthly dog food' },
+        { cat: 'Mylo — Grooming',        mo: calc.groomMonthly, note: 'Mini/full alt. every 6 wks' },
+        { cat: 'Groceries',              mo: groceries,         note: 'For two people' },
+        { cat: 'Transportation',         mo: transport,         note: 'Gas, parking, maintenance' },
+        { cat: 'Phone Bill',             mo: phone,             note: 'Combined plan' },
+        { cat: 'Health / Medical',       mo: medical,           note: 'Insurance + copays' },
+        { cat: 'Household Items',        mo: household,         note: 'Supplies, cleaning, basics' },
+        { cat: 'Emergency / Savings',    mo: savings,           note: 'Minimum monthly contribution' },
+        ...(dining      > 0 ? [{ cat: 'Dining / Entertainment', mo: dining,      note: 'Restaurants & activities' }] : []),
+        ...(travel      > 0 ? [{ cat: 'Travel Fund',            mo: travel,      note: 'Vacation savings' }] : []),
+        ...(investments > 0 ? [{ cat: 'Investments',            mo: investments, note: '401k, brokerage, etc.' }] : []),
+      ];
+
+      const pieData = items.filter(i => i.mo > 0).map(i => ({
+        name: i.cat, value: Math.round(i.mo),
+      }));
+
+      // Abbreviated names for bar chart Y-axis
+      const ABBR = {
+        'Mortgage P&I': 'Mortgage',
+        'Property Taxes': 'Prop Tax',
+        'Homeowners Insurance': 'HO Ins.',
+        'Utilities': 'Utilities',
+        'HOA': 'HOA',
+        'Mylo — Food': 'Mylo Food',
+        'Mylo — Grooming': 'Mylo Groom',
+        'Groceries': 'Groceries',
+        'Transportation': 'Transport',
+        'Phone Bill': 'Phone',
+        'Health / Medical': 'Medical',
+        'Household Items': 'Household',
+        'Emergency / Savings': 'Savings',
+        'Dining / Entertainment': 'Dining',
+        'Travel Fund': 'Travel',
+        'Investments': 'Invest.',
+      };
+
+      const barData = items.filter(i => i.mo > 0).map(i => ({
+        name: ABBR[i.cat] || i.cat,
+        Monthly: Math.round(i.mo),
+        Annual:  Math.round(i.mo * 12),
+      }));
+
+      // ── Status colour maps ────────────────────────────────────────────
+      const STATUS = {
+        green:  { bg: 'bg-emerald-50',  border: 'border-emerald-200', text: 'text-emerald-700', bar: 'bg-emerald-400' },
+        yellow: { bg: 'bg-amber-50',    border: 'border-amber-200',   text: 'text-amber-700',   bar: 'bg-amber-400'   },
+        red:    { bg: 'bg-red-50',      border: 'border-red-200',     text: 'text-red-700',     bar: 'bg-red-400'     },
+      };
+      const sc = STATUS[calc.status];
+
+      // ── Sub-components ────────────────────────────────────────────────
+
+      const Label = ({ children }) => (
+        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">{children}</p>
+      );
+
+      const DashCard = ({ label, value, sub, gold }) => (
+        <div className={`rounded-2xl p-5 lift fade-in border ${gold
+          ? 'border-amber-200'
+          : 'bg-white border-stone-100 shadow-sm'
+        }`} style={gold ? { background: 'linear-gradient(135deg,#FFFBEB,#FEF3C7,#FAF7F2)' } : {}}>
+          <Label>{label}</Label>
+          <p className={`text-xl font-bold leading-none mt-1 ${gold ? 'text-amber-700' : 'text-stone-800'}`}>{value}</p>
+          {sub && <p className="text-[10px] text-stone-400 mt-2">{sub}</p>}
+        </div>
+      );
+
+      const SectionHead = ({ children }) => (
+        <div className="flex items-center gap-2 my-4">
+          <div className="h-px flex-1 bg-stone-100" />
+          <span className="text-[9px] font-bold text-stone-400 uppercase tracking-[0.18em] whitespace-nowrap">{children}</span>
+          <div className="h-px flex-1 bg-stone-100" />
+        </div>
+      );
+
+      const InputField = ({ label, value, onChange, pre = '$', suf = '', step = 100, min = 0 }) => (
+        <div className="mb-3">
+          <label className="block text-[10px] font-semibold text-stone-400 uppercase tracking-[0.1em] mb-1">{label}</label>
+          <div className="relative flex items-center">
+            {pre && <span className="absolute left-3 text-stone-400 text-sm select-none pointer-events-none">{pre}</span>}
+            <input
+              type="number"
+              value={value}
+              onChange={e => onChange(parseFloat(e.target.value) || 0)}
+              step={step}
+              min={min}
+              className={`w-full bg-stone-50 border border-stone-200 rounded-lg py-2 text-stone-800 text-sm font-semibold
+                focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all
+                ${pre ? 'pl-7' : 'pl-3'} ${suf ? 'pr-8' : 'pr-3'}`}
+            />
+            {suf && <span className="absolute right-3 text-stone-400 text-sm select-none pointer-events-none">{suf}</span>}
+          </div>
+        </div>
+      );
+
+      const ChartTooltip = ({ active, payload, label }) => {
+        if (!active || !payload?.length) return null;
+        return (
+          <div className="bg-white border border-stone-100 rounded-xl shadow-lg p-3 text-xs min-w-[130px]">
+            <p className="font-bold text-stone-700 mb-2">{label || payload[0]?.name}</p>
+            {payload.map((p, i) => (
+              <div key={i} className="flex justify-between gap-4">
+                <span className="text-stone-400">{p.name}</span>
+                <span className="font-semibold text-stone-700">{fmt(p.value)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      const PieTooltip = ({ active, payload }) => {
+        if (!active || !payload?.length) return null;
+        const total = pieData.reduce((s, d) => s + d.value, 0);
+        const share = total > 0 ? ((payload[0].value / total) * 100).toFixed(1) : '0';
+        return (
+          <div className="bg-white border border-stone-100 rounded-xl shadow-lg p-3 text-xs">
+            <p className="font-bold text-stone-700">{payload[0].name}</p>
+            <p className="text-stone-500 mt-1">{fmt(payload[0].value)}<span className="text-stone-400">/mo</span></p>
+            <p className="text-stone-400">{fmt(payload[0].value * 12)}<span className="text-stone-300">/yr</span></p>
+            <p className="text-amber-600 font-semibold mt-1">{share}% of budget</p>
+          </div>
+        );
+      };
+
+      // ── Render ────────────────────────────────────────────────────────
+      return (
+        <div className="min-h-screen" style={{ backgroundColor: '#FAF7F2' }}>
+
+          {/* ════════════════════════════ HERO ══════════════════════════ */}
+          <header style={{ background: 'linear-gradient(135deg, #1C1917 0%, #292524 60%, #1A1614 100%)' }}
+                  className="relative overflow-hidden">
+            {/* Subtle radial glow overlays */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(ellipse at 15% 60%, rgba(201,168,76,0.15) 0%, transparent 55%), radial-gradient(ellipse at 85% 20%, rgba(139,105,20,0.10) 0%, transparent 45%)'
+            }} />
+            <div className="relative max-w-6xl mx-auto px-6 py-16 md:py-20">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-px w-6" style={{ backgroundColor: '#C9A84C' }} />
+                <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#C9A84C' }}>
+                  Houston, Texas · 2026
+                </p>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+                Bare Minimum<br />
+                <span style={{ color: '#C9A84C' }}>Living Together Budget</span>
+              </h1>
+              <p className="text-stone-400 text-base md:text-lg max-w-lg leading-relaxed">
+                An interactive post-wedding household budget for{' '}
+                <span className="text-stone-200 font-semibold">Aabid, Noor, and Mylo.</span>
+              </p>
+              <div className="flex flex-wrap gap-3 mt-8">
+                {['🏠 $550K New Home','🐾 Mylo the Dog','💍 Newlyweds','📍 Houston, TX'].map(t => (
+                  <span key={t} className="text-xs text-stone-400 border border-stone-700 bg-white/5 rounded-full px-4 py-1.5">{t}</span>
+                ))}
+              </div>
+            </div>
+          </header>
+
+          {/* ════════════════════════ MAIN CONTENT ══════════════════════ */}
+          <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+
+            {/* ── Scenario selector ──────────────────────────────────── */}
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(SCENARIOS).map(([key, s]) => {
+                const active = activeScenario === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => applyScenario(key)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold border transition-all
+                      ${active
+                        ? 'text-white border-transparent shadow-md'
+                        : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400 hover:shadow-sm'
+                      }`}
+                    style={active ? { backgroundColor: '#1C1917' } : {}}
+                  >
+                    {s.label}
+                    <span className={`text-[10px] font-normal ${active ? 'text-stone-400' : 'text-stone-400'}`}>
+                      {s.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── Dashboard cards ────────────────────────────────────── */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+              <DashCard label="Monthly Mortgage"       value={fmt(calc.mortgage, 2)}    sub="Principal & Interest" />
+              <DashCard label="Total Housing Cost"     value={fmt(calc.totalHousing)}   sub="All housing line items" />
+              <DashCard label="Mylo Monthly"           value={fmt(calc.totalMylo)}      sub="Food + grooming average" />
+              <DashCard label="Total Monthly Budget"   value={fmt(calc.totalMonthly)}   sub="Everything combined" gold />
+              <DashCard label="Annual After-Tax Needed" value={fmt(calc.annualAfterTax)} sub="Total × 12 months" />
+              <DashCard label="Est. Pre-Tax Income"    value={fmt(calc.annualPreTax)}   sub="~28% effective tax (no TX state)" />
+            </div>
+
+            {/* ── Affordability checker ──────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+              <h2 className="text-base font-bold text-stone-800 mb-5">Affordability Check</h2>
+              <div className="grid md:grid-cols-2 gap-6 items-start">
+
+                {/* Left: income input + numbers */}
+                <div>
+                  <InputField
+                    label="Combined Monthly After-Tax Income"
+                    value={income}
+                    onChange={setIncome}
+                    step={500}
+                    min={0}
+                  />
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div className={`rounded-xl p-3.5 border ${calc.surplus >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                      <Label>Monthly Surplus</Label>
+                      <p className={`text-xl font-bold ${calc.surplus >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {calc.surplus >= 0 ? '+' : ''}{fmt(calc.surplus)}
+                      </p>
+                    </div>
+                    <div className={`rounded-xl p-3.5 border ${sc.bg} ${sc.border}`}>
+                      <Label>Income Used</Label>
+                      <p className={`text-xl font-bold ${sc.text}`}>{pct(calc.pctOfIncome)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: progress bar + status badge */}
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <div className="flex justify-between text-[10px] font-medium text-stone-400 mb-1.5">
+                      <span>Budget: {fmt(calc.totalMonthly)}/mo</span>
+                      <span>Income: {fmt(income)}/mo</span>
+                    </div>
+                    <div className="h-3 rounded-full bg-stone-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full bar-fill ${sc.bar}`}
+                        style={{ width: `${Math.min(calc.pctOfIncome, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-stone-300 mt-1 px-0.5">
+                      <span>0%</span>
+                      <span className="text-amber-400 font-bold">60%</span>
+                      <span className="text-red-300 font-bold">75%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                  <div className={`rounded-xl p-4 border text-center ${sc.bg} ${sc.border}`}>
+                    <p className={`text-sm font-bold ${sc.text}`}>
+                      {calc.status === 'green'  && '✓  Healthy Budget Allocation'}
+                      {calc.status === 'yellow' && '⚠  Moderate Budget Strain'}
+                      {calc.status === 'red'    && '✗  Budget Overextended'}
+                    </p>
+                    <p className="text-[11px] text-stone-500 mt-1.5 leading-relaxed">
+                      {calc.status === 'green'  && 'Under 60% on essentials — solid financial footing.'}
+                      {calc.status === 'yellow' && '60–75% on essentials — manageable, but watch discretionary.'}
+                      {calc.status === 'red'    && 'Over 75% — consider boosting income or trimming costs.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Two-column: inputs + content ──────────────────────── */}
+            <div className="grid md:grid-cols-[300px_1fr] gap-6">
+
+              {/* ──────────────── INPUT PANEL ──────────────────────── */}
+              <div className="md:self-start md:sticky md:top-4">
+                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+                  <h2 className="text-base font-bold text-stone-800 mb-2">Edit Your Budget</h2>
+                  <p className="text-[10px] text-stone-400 mb-1">All fields are live — changes update instantly.</p>
+
+                  <SectionHead>Home Purchase</SectionHead>
+                  <InputField label="Home Price"        value={homePrice}  onChange={setHomePrice}  step={10000} />
+                  <InputField label="Down Payment"      value={downPct}    onChange={setDownPct}    pre="" suf="%" step={1} />
+                  <InputField label="Interest Rate"     value={rate}       onChange={setRate}       pre="" suf="%" step={0.125} />
+                  <InputField label="Property Tax Rate" value={taxPct}     onChange={setTaxPct}     pre="" suf="%" step={0.1} />
+
+                  <SectionHead>Monthly Housing</SectionHead>
+                  <InputField label="Homeowners Insurance" value={insurance}  onChange={setInsurance}  step={10} />
+                  <InputField label="Utilities"             value={utilities}  onChange={setUtilities}  step={25} />
+                  <InputField label="HOA Fees"              value={hoa}        onChange={setHoa}        step={25} />
+
+                  <SectionHead>Mylo 🐾</SectionHead>
+                  <InputField label="Monthly Food"              value={myloFood}  onChange={setMyloFood}  step={25} />
+                  <InputField label="Mini Groom (every 6 wks)"  value={miniGroom} onChange={setMiniGroom} step={10} />
+                  <InputField label="Full Groom (every 6 wks)"  value={fullGroom} onChange={setFullGroom} step={10} />
+                  {/* Live grooming monthly average hint */}
+                  <div className="text-[10px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2 mb-1 -mt-1">
+                    Monthly avg:{' '}
+                    <span className="font-bold text-stone-600">{fmt(calc.groomMonthly)}</span>
+                    {' '}· alternating mini & full every 6 wks
+                  </div>
+
+                  <SectionHead>Living Expenses</SectionHead>
+                  <InputField label="Groceries (for two)"     value={groceries}  onChange={setGroceries}  step={50} />
+                  <InputField label="Transportation"           value={transport}  onChange={setTransport}  step={50} />
+                  <InputField label="Phone Bill"               value={phone}      onChange={setPhone}      step={25} />
+                  <InputField label="Health / Medical"         value={medical}    onChange={setMedical}    step={50} />
+                  <InputField label="Household Items"          value={household}  onChange={setHousehold}  step={25} />
+                  <InputField label="Emergency / Savings"      value={savings}    onChange={setSavings}    step={100} />
+
+                  {(dining > 0 || travel > 0 || investments > 0) && (
+                    <>
+                      <SectionHead>Extras</SectionHead>
+                      {dining      > 0 && <InputField label="Dining / Entertainment" value={dining}      onChange={setDining}      step={100} />}
+                      {travel      > 0 && <InputField label="Travel Fund"             value={travel}      onChange={setTravel}      step={100} />}
+                      {investments > 0 && <InputField label="Investments"             value={investments} onChange={setInvestments} step={100} />}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* ──────────────── RIGHT COLUMN ─────────────────────── */}
+              <div className="space-y-6">
+
+                {/* Budget breakdown table */}
+                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-stone-50">
+                    <h2 className="text-base font-bold text-stone-800">Budget Breakdown</h2>
+                    <p className="text-[10px] text-stone-400 mt-0.5">All figures in USD · Houston, TX estimates</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: '#FAF7F2' }}>
+                          <th className="text-left   px-6 py-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Category</th>
+                          <th className="text-right  px-4 py-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Monthly</th>
+                          <th className="text-right  px-4 py-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Annual</th>
+                          <th className="text-left   px-4 py-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest hidden lg:table-cell">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-50">
+                        {items.map(item => (
+                          <tr key={item.cat} className="hover:bg-stone-50 transition-colors">
+                            <td className="px-6 py-3.5 text-sm text-stone-700 font-medium">{item.cat}</td>
+                            <td className="px-4 py-3.5 text-sm text-right font-semibold text-stone-800">{fmt(item.mo, 2)}</td>
+                            <td className="px-4 py-3.5 text-sm text-right text-stone-500">{fmt(item.mo * 12)}</td>
+                            <td className="px-4 py-3.5 text-xs text-stone-400 hidden lg:table-cell">{item.note}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ backgroundColor: '#FFFBEB', borderTop: '2px solid #FCD34D' }}>
+                          <td className="px-6 py-4 text-sm font-extrabold text-stone-800">Total</td>
+                          <td className="px-4 py-4 text-sm text-right font-extrabold" style={{ color: '#B45309' }}>{fmt(calc.totalMonthly, 2)}</td>
+                          <td className="px-4 py-4 text-sm text-right font-bold text-stone-700">{fmt(calc.totalMonthly * 12)}</td>
+                          <td className="hidden lg:table-cell" />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Charts row */}
+                <div className="grid sm:grid-cols-2 gap-4">
+
+                  {/* Pie chart */}
+                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+                    <h3 className="text-sm font-bold text-stone-800">Monthly Distribution</h3>
+                    <p className="text-[10px] text-stone-400 mb-3">Share of total monthly spend</p>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%" cy="50%"
+                          innerRadius={55}
+                          outerRadius={90}
+                          dataKey="value"
+                          stroke="none"
+                          paddingAngle={2}
+                        >
+                          {pieData.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<PieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Custom compact legend */}
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                      {pieData.map((d, i) => (
+                        <div key={d.name} className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="text-[9px] text-stone-500 truncate">{d.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bar chart — monthly vs annual */}
+                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+                    <h3 className="text-sm font-bold text-stone-800">Monthly vs Annual</h3>
+                    <p className="text-[10px] text-stone-400 mb-3">By category (hover for details)</p>
+                    <ResponsiveContainer width="100%" height={290}>
+                      <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F5F5F4" />
+                        <XAxis
+                          type="number"
+                          tick={{ fontSize: 9, fill: '#A8A29E' }}
+                          tickFormatter={v => v >= 10000 ? `$${(v/1000).toFixed(0)}k` : v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`}
+                          axisLine={false} tickLine={false}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fontSize: 8.5, fill: '#78716C' }}
+                          width={64}
+                          axisLine={false} tickLine={false}
+                        />
+                        <Tooltip content={<ChartTooltip />} />
+                        <Bar dataKey="Monthly" fill="#C9A84C" radius={[0,3,3,0]} maxBarSize={10} />
+                        <Bar dataKey="Annual"  fill="#E8D5A3" radius={[0,3,3,0]} maxBarSize={10} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Quick-stats row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Down Payment',    value: fmt(calc.downAmount),        sub: `${downPct}% of purchase` },
+                    { label: 'Loan Amount',     value: fmt(calc.principal),         sub: `${term}-yr @ ${rate}%` },
+                    { label: 'Housing / Total', value: pct((calc.totalHousing / calc.totalMonthly) * 100), sub: 'housing share of budget' },
+                    { label: 'Mylo Annual',     value: fmt(calc.totalMylo * 12),    sub: 'food + grooming' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 lift">
+                      <Label>{s.label}</Label>
+                      <p className="text-lg font-bold text-stone-800 mt-1">{s.value}</p>
+                      <p className="text-[10px] text-stone-400 mt-1">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Disclaimer footer ─────────────────────────────────── */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
+              <p className="text-xs text-stone-400 max-w-2xl mx-auto leading-relaxed">
+                <span className="font-semibold text-stone-500">Disclaimer:</span>{' '}
+                This is a planning estimate only and should be reviewed with actual lender quotes, insurance estimates, and tax rates.
+                Mortgage uses a standard fixed-rate amortization formula. Property tax rate reflects Houston, TX averages and varies by municipality.
+                Grooming cost assumes alternating mini and full groom every 6 weeks. Pre-tax income estimate assumes ~28% effective tax rate (Texas has no state income tax).
+              </p>
+              <p className="text-[10px] text-stone-300 mt-3">
+                Made with ♥ for Aabid, Noor & Mylo · Houston, TX · 2026
+              </p>
+            </div>
+
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
