@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bare Minimum Living Together Budget — Aabid, Noor & Mylo</title>
-  <script src="https://unpkg.com/react@18.2.0/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.6/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -35,7 +35,15 @@
   </style>
 </head>
 <body>
+  <div id="error-banner" style="display:none;padding:20px;background:#fee2e2;color:#991b1b;font-family:monospace;white-space:pre-wrap;font-size:13px;border-bottom:2px solid #fca5a5;"></div>
   <div id="root"></div>
+  <script>
+    window.onerror = function(msg, src, line, col, err) {
+      var b = document.getElementById('error-banner');
+      b.style.display = 'block';
+      b.textContent = '❌ JS Error: ' + msg + '\n' + (err && err.stack ? err.stack : '') + '\nSource: ' + src + ':' + line;
+    };
+  </script>
 
   <script type="text/babel">
     const { useState, useMemo } = React;
